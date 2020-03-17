@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -27,7 +28,7 @@ public class StatusController {
   private final ConsumerThreadController consumerThreadController;
   private final AdminClient adminClient;
 
-  public Map<String, StoreStatus> storeStatus() {
+  private Map<String, StoreStatus> storeStatus() {
 
     return recordStoreController.getStores().values().stream()
         .map(store -> Pair.of(store.getStoreName(), store.status()))
@@ -48,18 +49,50 @@ public class StatusController {
     return consumerStatus;
   }
 
-  public Map<TopicPartition, TopicPartitionOffsets> topicStatus() throws InterruptedException {
+  private Map<TopicPartition, TopicPartitionOffsets> topicStatus() throws InterruptedException {
     return consumerThreadController.consumerStatus();
   }
 
-  public String printableStatus() {
+  @Data
+  private class ConsumerStat {
+
+    long lag = 0;
+    long consumedMessages = 0;
+  }
+
+  private Map<String, ConsumerStat> consumerLagByTopic() throws InterruptedException {
+    Map<TopicPartition, TopicPartitionOffsets> topicStatus = topicStatus();
+    Map<TopicPartition, PartitionConsumptionStatus> consumerStatus = consumerStatus();
+
+    Map<String, ConsumerStat> outputMap = new HashMap<>();
+    consumerStatus.forEach(((topicPartition, consumptionStat) -> {
+      TopicPartitionOffsets partitionOffsets = topicStatus.get(topicPartition);
+
+      ConsumerStat stat = outputMap
+          .computeIfAbsent(topicPartition.topic(), s -> new ConsumerStat());
+      stat.setLag(
+          stat.getLag() + partitionOffsets.getEndOffset() - consumptionStat.getLatestOffsets()-1);
+      stat.setConsumedMessages(stat.getConsumedMessages() + consumptionStat.getConsumedMessages());
+    }));
+    return outputMap;
+  }
+
+  public String printableStatus() throws InterruptedException {
     StringBuilder sb = new StringBuilder();
-    sb.append("Stores\n");
+    sb.append("Stores:\n");
     List<List<String>> table = new ArrayList<>();
     table.add(Arrays.asList("Name", "# Records"));
     storeStatus().forEach(
         (key, value) -> table.add(Arrays.asList(key, String.valueOf(value.getMessagesInStore()))));
-    sb.append(printableTable(table)).append("\n");
+    sb.append(printableTable(table));
+
+    sb.append("Consumer Topics:\n");
+    List<List<String>> topicTable = new ArrayList<>();
+    topicTable.add(Arrays.asList("Topic", "Lag", "# Consumed"));
+    consumerLagByTopic().forEach((topic, stat) -> topicTable
+        .add(Arrays.asList(topic, String.valueOf(stat.getLag()),
+            String.valueOf(stat.getConsumedMessages()))));
+    sb.append(printableTable(topicTable));
 
     return sb.toString();
   }

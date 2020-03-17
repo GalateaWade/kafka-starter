@@ -1,6 +1,7 @@
 package org.galatea.kafka.shell.consumer;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,9 @@ public class ConsumerThreadController {
 
   public Map<TopicPartition, TopicPartitionOffsets> consumerStatus() throws InterruptedException {
 
+    if (runner.getProperties().getAssignment().isEmpty()) {
+      return new HashMap<>();
+    }
     Semaphore lock = runner.getProperties().getOffsetsRequested();
     lock.acquire(); // tell the consumer to get offsets
     lock.acquire(); // request received, block until request fulfilled

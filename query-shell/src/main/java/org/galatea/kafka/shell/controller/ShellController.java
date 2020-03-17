@@ -1,6 +1,7 @@
 package org.galatea.kafka.shell.controller;
 
 import com.apple.foundationdb.tuple.Tuple;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,7 +27,7 @@ public class ShellController {
   private final StatusController statusController;
 
   @ShellMethod("Get status of the service")
-  public String status() {
+  public String status() throws InterruptedException {
     return statusController.printableStatus();
   }
 
@@ -89,30 +90,36 @@ public class ShellController {
     }
 
     StringBuilder ob = new StringBuilder();
-    boolean effectiveCompact = Boolean.parseBoolean(compact);
-    if (recordStoreController.storeExist(topicName, effectiveCompact)) {
-      return ob.append("Already listening to topic ").append(topicName)
-          .append(" with config compact=").append(effectiveCompact).toString();
-    }
-    OffsetTrackingRecordStore store = recordStoreController.newStore(topicName, effectiveCompact);
-    consumerThreadController.addStoreAssignment(topicName, store);
-    consumerThreadController.addTopicToAssignment(topicName);
-    boolean createAlias = false;
-    if (alias != null) {
-      if (recordStoreController.storeExist(alias)) {
-        ob.append("WARN: could not use alias ").append(alias)
-            .append(" since a store exists with that name\n");
-      } else {
-        createAlias = true;
-        storeAlias.put(alias, store.getStoreName());
+    try {
+      boolean effectiveCompact = Boolean.parseBoolean(compact);
+      if (recordStoreController.storeExist(topicName, effectiveCompact)) {
+        return ob.append("Already listening to topic ").append(topicName)
+            .append(" with config compact=").append(effectiveCompact).toString();
       }
-    }
-    ob.append("Created store ").append(store.getStoreName());
-    if (createAlias) {
-      ob.append(" with alias ").append(alias);
-    }
+      OffsetTrackingRecordStore store = recordStoreController.newStore(topicName, effectiveCompact);
+      consumerThreadController.addStoreAssignment(topicName, store);
+      consumerThreadController.addTopicToAssignment(topicName);
 
-    return ob.toString();
+      boolean createAlias = false;
+      if (alias != null) {
+        if (recordStoreController.storeExist(alias)) {
+          ob.append("WARN: could not use alias ").append(alias)
+              .append(" since a store exists with that name\n");
+        } else {
+          createAlias = true;
+          storeAlias.put(alias, store.getStoreName());
+        }
+      }
+      ob.append("Created store ").append(store.getStoreName());
+      if (createAlias) {
+        ob.append(" with alias ").append(alias);
+      }
+
+      return ob.toString();
+    } catch (UndeclaredThrowableException e) {
+      System.err.println("Could not listen to topic: " + e.getCause().getMessage());
+      return "";
+    }
   }
 
 }
