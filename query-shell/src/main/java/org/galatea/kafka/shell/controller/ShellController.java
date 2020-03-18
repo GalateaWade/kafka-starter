@@ -26,6 +26,7 @@ public class ShellController {
   private final ConsumerThreadController consumerThreadController;
   private final StatusController statusController;
 
+  // TODO: live-updating status
   @ShellMethod("Get status of the service")
   public String status() throws InterruptedException {
     return statusController.printableStatus();

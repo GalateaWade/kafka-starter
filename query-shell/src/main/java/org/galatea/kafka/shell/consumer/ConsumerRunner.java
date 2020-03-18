@@ -54,20 +54,20 @@ public class ConsumerRunner implements Runnable {
         updateStatistics(record);
       });
 
+      // TODO: check this semaphore logic (with a topic with tons of messages)
       Semaphore offsetRequestSemaphore = properties.getOffsetsRequested();
       if (offsetRequestSemaphore.availablePermits() == 0) {
-        offsetRequestSemaphore.release(); // tell the main thread that the request has been received
         Map<TopicPartition, Long> endOffsets = consumer
             .endOffsets(properties.getAssignment());
         Map<TopicPartition, Long> beginningOffsets = consumer
             .beginningOffsets(properties.getAssignment());
+        Map<TopicPartition, TopicPartitionOffsets> offsets = new HashMap<>();
         endOffsets.forEach(((topicPartition, endOffset) -> {
           Long beginningOffset = beginningOffsets.get(topicPartition);
-          Map<TopicPartition, TopicPartitionOffsets> offsets = new HashMap<>();
           offsets.put(topicPartition, new TopicPartitionOffsets(beginningOffset, endOffset));
-          properties.setOffsetsMap(offsets);
-          offsetRequestSemaphore.release(); // tell main thread the request is fulfilled
         }));
+        properties.setOffsetsMap(offsets);
+        offsetRequestSemaphore.release(2); // tell main thread the request is fulfilled
       }
 
 

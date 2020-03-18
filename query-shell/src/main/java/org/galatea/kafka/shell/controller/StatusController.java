@@ -64,6 +64,7 @@ public class StatusController {
     Map<TopicPartition, TopicPartitionOffsets> topicStatus = topicStatus();
     Map<TopicPartition, PartitionConsumptionStatus> consumerStatus = consumerStatus();
 
+    // TODO: consumer could not have received messages from all partitions yet, NPE
     Map<String, ConsumerStat> outputMap = new HashMap<>();
     consumerStatus.forEach(((topicPartition, consumptionStat) -> {
       TopicPartitionOffsets partitionOffsets = topicStatus.get(topicPartition);
@@ -86,6 +87,7 @@ public class StatusController {
         (key, value) -> table.add(Arrays.asList(key, String.valueOf(value.getMessagesInStore()))));
     sb.append(printableTable(table));
 
+    // TODO: add commas to the lag and #consumed values
     sb.append("Consumer Topics:\n");
     List<List<String>> topicTable = new ArrayList<>();
     topicTable.add(Arrays.asList("Topic", "Lag", "# Consumed"));
