@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.galatea.kafka.shell.config.MessagingConfig;
 import org.galatea.kafka.shell.consumer.ConsumerThreadController;
 import org.galatea.kafka.shell.stores.OffsetTrackingRecordStore;
 import org.rocksdb.RocksIterator;
@@ -18,13 +18,26 @@ import org.springframework.shell.standard.ShellOption;
 
 @Slf4j
 @ShellComponent
-@RequiredArgsConstructor
 public class ShellController {
 
   private final Map<String, String> storeAlias = new HashMap<>();
   private final RecordStoreController recordStoreController;
   private final ConsumerThreadController consumerThreadController;
   private final StatusController statusController;
+  private final MessagingConfig messagingConfig;
+
+  public ShellController(RecordStoreController recordStoreController,
+      ConsumerThreadController consumerThreadController, StatusController statusController,
+      MessagingConfig messagingConfig) {
+    this.recordStoreController = recordStoreController;
+    this.consumerThreadController = consumerThreadController;
+    this.statusController = statusController;
+    this.messagingConfig = messagingConfig;
+    System.out
+        .println(String.format("Connected to brokers: %s", messagingConfig.getBootstrapServer()));
+    System.out.println(
+        String.format("Connected to schema registry: %s", messagingConfig.getSchemaRegistryUrl()));
+  }
 
   // TODO: live-updating status
   @ShellMethod("Get status of the service")

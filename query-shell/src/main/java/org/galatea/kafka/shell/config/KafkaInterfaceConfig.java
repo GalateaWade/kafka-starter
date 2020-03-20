@@ -9,7 +9,6 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.galatea.kafka.starter.messaging.AvroSerdeUtil;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,23 +16,21 @@ import org.springframework.context.annotation.Configuration;
 public class KafkaInterfaceConfig {
 
   @Bean
-  public Consumer<GenericRecord, GenericRecord> consumer(
-      @Value("${messaging.schema-registry-url}") String schemaRegistryUrl,
-      @Value("${messaging.bootstrap-server}") String bootstrapServer) {
+  public Consumer<GenericRecord, GenericRecord> consumer(MessagingConfig config) {
     Properties props = new Properties();
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBootstrapServer());
 
     return new KafkaConsumer<>(props,
-        AvroSerdeUtil.genericKeySerde(schemaRegistryUrl).deserializer(),
-        AvroSerdeUtil.genericValueSerde(schemaRegistryUrl).deserializer());
+        AvroSerdeUtil.genericKeySerde(config.getSchemaRegistryUrl()).deserializer(),
+        AvroSerdeUtil.genericValueSerde(config.getSchemaRegistryUrl()).deserializer());
   }
 
   @Bean
-  public AdminClient adminClient(@Value("${messaging.bootstrap-server}") String bootstrapServer) {
+  public AdminClient adminClient(MessagingConfig config) {
     Properties props = new Properties();
-    props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
+    props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBootstrapServer());
     return KafkaAdminClient.create(props);
   }
 
