@@ -1,12 +1,11 @@
 package org.galatea.kafka.shell.consumer;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.galatea.kafka.shell.domain.ConsumerProperties;
-import org.galatea.kafka.shell.domain.TopicPartitionOffsets;
+import org.galatea.kafka.shell.domain.ConsumerRequest;
 import org.galatea.kafka.shell.stores.OffsetTrackingRecordStore;
 import org.springframework.stereotype.Component;
 
@@ -54,22 +53,11 @@ public class ConsumerRunner implements Runnable {
         updateStatistics(record);
       });
 
-      // TODO: check this semaphore logic (with a topic with tons of messages)
-      Semaphore offsetRequestSemaphore = properties.getOffsetsRequested();
-      if (offsetRequestSemaphore.availablePermits() == 0) {
-        Map<TopicPartition, Long> endOffsets = consumer
-            .endOffsets(properties.getAssignment());
-        Map<TopicPartition, Long> beginningOffsets = consumer
-            .beginningOffsets(properties.getAssignment());
-        Map<TopicPartition, TopicPartitionOffsets> offsets = new HashMap<>();
-        endOffsets.forEach(((topicPartition, endOffset) -> {
-          Long beginningOffset = beginningOffsets.get(topicPartition);
-          offsets.put(topicPartition, new TopicPartitionOffsets(beginningOffset, endOffset));
-        }));
-        properties.setOffsetsMap(offsets);
-        offsetRequestSemaphore.release(2); // tell main thread the request is fulfilled
+      if (!properties.getPendingRequests().isEmpty()) {
+        List<ConsumerRequest<?>> requests = new ArrayList<>();
+        properties.getPendingRequests().drainTo(requests);
+        requests.forEach(request -> request.internalFulfillRequest(consumer));
       }
-
 
     }
   }

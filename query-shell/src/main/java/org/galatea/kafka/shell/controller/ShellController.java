@@ -3,7 +3,10 @@ package org.galatea.kafka.shell.controller;
 import com.apple.foundationdb.tuple.Tuple;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
@@ -11,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.galatea.kafka.shell.config.MessagingConfig;
 import org.galatea.kafka.shell.consumer.ConsumerThreadController;
 import org.galatea.kafka.shell.stores.OffsetTrackingRecordStore;
+import org.galatea.kafka.shell.util.Extractor;
 import org.rocksdb.RocksIterator;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
@@ -48,7 +52,7 @@ public class ShellController {
   @ShellMethod("Search a store using REGEX")
   public String query(
       @ShellOption String storeName,
-      @ShellOption String regex) {
+      @ShellOption(valueProvider = Extractor.class) String regex) {
 
     StringBuilder ob = new StringBuilder();
     if (!recordStoreController.storeExist(storeName) && !storeAlias.containsKey(storeName)) {
@@ -61,19 +65,34 @@ public class ShellController {
 
     RocksIterator iterator = episodeStore.getUnderlyingDb().newIterator();
     iterator.seekToFirst();
-    Pattern p = Pattern.compile(regex);
-    ob.append("Results for regex '").append(regex).append("':\n");
+
+    List<Pattern> patterns = new ArrayList<>();
+    for (String pattern : regex) {
+      patterns.add(Pattern.compile(pattern));
+    }
+
+    ob.append("Results for regex set '").append(Arrays.toString(regex)).append("':\n");
     Instant startTime = Instant.now();
     long numResults = 0;
+
     while (iterator.isValid()) {
-      if (p.matcher((CharSequence) Tuple.fromBytes(iterator.value()).get(3)).find()) {
-        Tuple valueTuple = Tuple.fromBytes(iterator.value());
+      Tuple valueTuple = Tuple.fromBytes(iterator.value());
+      boolean recordMatches = true;
+      String recordString = valueTuple.getString(3);
+      for (Pattern pattern : patterns) {
+        if (!pattern.matcher(recordString).find()) {
+          recordMatches = false;
+          break;
+        }
+      }
+
+      if (recordMatches) {
         ob.append(Instant.ofEpochMilli(valueTuple.getLong(2)))
-            .append(": ").append(valueTuple.get(3)).append("\n");
-        numResults++;
+            .append(": ").append(recordString).append("\n");
       }
       iterator.next();
     }
+
     ob.append("\n").append(numResults).append(" Results found in ")
         .append(readableTimeSince(startTime)).append("\n");
     iterator.close();

@@ -1,15 +1,16 @@
 package org.galatea.kafka.shell.controller;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.common.TopicPartition;
 import org.galatea.kafka.shell.consumer.ConsumerThreadController;
 import org.galatea.kafka.shell.domain.ConsumerProperties;
@@ -26,7 +27,7 @@ public class StatusController {
 
   private final RecordStoreController recordStoreController;
   private final ConsumerThreadController consumerThreadController;
-  private final AdminClient adminClient;
+  private final NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.US);
 
   private Map<String, StoreStatus> storeStatus() {
 
@@ -42,8 +43,13 @@ public class StatusController {
     properties.getAssignment().forEach(topicPartition -> {
       PartitionConsumptionStatus status = new PartitionConsumptionStatus();
       consumerStatus.put(topicPartition, status);
-      status.setConsumedMessages(properties.getConsumedMessages().get(topicPartition));
-      status.setLatestOffsets(properties.getLatestOffset().get(topicPartition));
+
+      if (properties.getConsumedMessages().containsKey(topicPartition)) {
+        status.setConsumedMessages(properties.getConsumedMessages().get(topicPartition));
+      }
+      if (properties.getLatestOffset().containsKey(topicPartition)) {
+        status.setLatestOffsets(properties.getLatestOffset().get(topicPartition));
+      }
     });
 
     return consumerStatus;
@@ -54,7 +60,7 @@ public class StatusController {
   }
 
   @Data
-  private class ConsumerStat {
+  private static class ConsumerStat {
 
     long lag = 0;
     long consumedMessages = 0;
@@ -64,17 +70,26 @@ public class StatusController {
     Map<TopicPartition, TopicPartitionOffsets> topicStatus = topicStatus();
     Map<TopicPartition, PartitionConsumptionStatus> consumerStatus = consumerStatus();
 
-    // TODO: consumer could not have received messages from all partitions yet, NPE
     Map<String, ConsumerStat> outputMap = new HashMap<>();
-    consumerStatus.forEach(((topicPartition, consumptionStat) -> {
-      TopicPartitionOffsets partitionOffsets = topicStatus.get(topicPartition);
+    topicStatus.forEach((topicPartition, partitionOffsets) -> {
+
+      PartitionConsumptionStatus partitionConsumptionStatus = consumerStatus.get(topicPartition);
+      long latestOffsetSeen = 1;
+      long consumedMessages = 0;
+      if (partitionConsumptionStatus != null) {
+        latestOffsetSeen = partitionConsumptionStatus.getLatestOffsets();
+        consumedMessages = partitionConsumptionStatus.getConsumedMessages();
+      }
+      latestOffsetSeen = Math.max(partitionOffsets.getBeginningOffset(), latestOffsetSeen);
 
       ConsumerStat stat = outputMap
           .computeIfAbsent(topicPartition.topic(), s -> new ConsumerStat());
-      stat.setLag(
-          stat.getLag() + partitionOffsets.getEndOffset() - consumptionStat.getLatestOffsets()-1);
-      stat.setConsumedMessages(stat.getConsumedMessages() + consumptionStat.getConsumedMessages());
-    }));
+      if (partitionOffsets.getEndOffset() != partitionOffsets.getBeginningOffset()) {
+        stat.setLag(stat.getLag() + partitionOffsets.getEndOffset() - latestOffsetSeen - 1);
+      }
+      stat.setConsumedMessages(stat.getConsumedMessages() + consumedMessages);
+    });
+
     return outputMap;
   }
 
@@ -84,16 +99,16 @@ public class StatusController {
     List<List<String>> table = new ArrayList<>();
     table.add(Arrays.asList("Name", "# Records"));
     storeStatus().forEach(
-        (key, value) -> table.add(Arrays.asList(key, String.valueOf(value.getMessagesInStore()))));
+        (key, value) -> table
+            .add(Arrays.asList(key, numberFormat.format(value.getMessagesInStore()))));
     sb.append(printableTable(table));
 
-    // TODO: add commas to the lag and #consumed values
     sb.append("Consumer Topics:\n");
     List<List<String>> topicTable = new ArrayList<>();
     topicTable.add(Arrays.asList("Topic", "Lag", "# Consumed"));
     consumerLagByTopic().forEach((topic, stat) -> topicTable
-        .add(Arrays.asList(topic, String.valueOf(stat.getLag()),
-            String.valueOf(stat.getConsumedMessages()))));
+        .add(Arrays.asList(topic, numberFormat.format(stat.getLag()),
+            numberFormat.format(stat.getConsumedMessages()))));
     sb.append(printableTable(topicTable));
 
     return sb.toString();

@@ -4,7 +4,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import lombok.Data;
 import org.apache.kafka.common.TopicPartition;
 import org.galatea.kafka.shell.stores.OffsetTrackingRecordStore;
@@ -20,6 +21,5 @@ public class ConsumerProperties {
   private Map<TopicPartition, Long> latestOffset = new HashMap<>();
   private Map<TopicPartition, Long> consumedMessages = new HashMap<>();
 
-  private Semaphore offsetsRequested = new Semaphore(0);
-  private Map<TopicPartition, TopicPartitionOffsets> offsetsMap = null;
+  private BlockingQueue<ConsumerRequest<?>> pendingRequests = new LinkedBlockingQueue<>();
 }

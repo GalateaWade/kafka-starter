@@ -4,6 +4,7 @@ import com.apple.foundationdb.tuple.Tuple;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.galatea.kafka.starter.util.Pair;
 
 @Slf4j
 public class RecordSerializer {
@@ -18,8 +19,8 @@ public class RecordSerializer {
   }
 
   public static byte[] value(ConsumerRecord<GenericRecord, GenericRecord> record) {
-    return Tuple.from(record.partition(), record.offset(), record.timestamp(), record.toString())
-        .pack();
+    return Tuple.from(record.partition(), record.offset(), record.timestamp(),
+        Pair.of(record.key(), record.value()).toString()).pack();
   }
 
   public static byte[] topicName(String topicName, int partition) {

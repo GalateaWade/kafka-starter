@@ -14,6 +14,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InvalidTopicException;
+import org.galatea.kafka.shell.domain.ConsumerOffsetRequest;
 import org.galatea.kafka.shell.domain.ConsumerProperties;
 import org.galatea.kafka.shell.domain.TopicPartitionOffsets;
 import org.galatea.kafka.shell.stores.OffsetTrackingRecordStore;
@@ -32,11 +33,9 @@ public class ConsumerThreadController {
     if (runner.getProperties().getAssignment().isEmpty()) {
       return new HashMap<>();
     }
-    Semaphore lock = runner.getProperties().getOffsetsRequested();
-    lock.acquire(); // tell the consumer to get offsets
-    lock.acquire(); // request received, block until request fulfilled
-
-    return runner.getProperties().getOffsetsMap();
+    ConsumerOffsetRequest request = new ConsumerOffsetRequest();
+    runner.getProperties().getPendingRequests().add(request);
+    return request.get();
   }
 
   public ConsumerProperties consumerProperties() {

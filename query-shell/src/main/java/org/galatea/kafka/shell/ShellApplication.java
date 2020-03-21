@@ -14,17 +14,4 @@ public class ShellApplication {
     SpringApplication.run(ShellApplication.class, args);
   }
 
-//  private final ConsumerThreadController consumerThreadController;
-//  private final RecordStoreController recordStoreController;
-
-//  @Override
-//  public void run(String... args) throws Exception {
-//    String topic = "ad.episode.store";
-//    OffsetTrackingRecordStore episodeStore = recordStoreController
-//        .newStore(topic, false);
-//    consumerThreadController.addStoreAssignment(topic, episodeStore);
-//    consumerThreadController.addTopicToAssignment(topic);
-//
-//
-//  }
 }
